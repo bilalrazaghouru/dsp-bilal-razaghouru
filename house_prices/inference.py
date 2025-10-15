@@ -1,18 +1,39 @@
 import pandas as pd
 import numpy as np
 import joblib
-from house_prices.preprocess import transform_features
 
 
 def make_predictions(input_data: pd.DataFrame) -> np.ndarray:
-    """Load saved model and preprocessors to predict on new data."""
+    """
+    Make predictions on input data using the saved model and preprocessing objects.
+
+    Steps:
+    - Load model, encoder, and scaler
+    - Preprocess numeric and categorical columns
+    - Generate predictions and return as numpy array
+
+    Args:
+        input_data (pd.DataFrame): New dataset to predict on
+
+    Returns:
+        np.ndarray: Predicted house prices
+    """
+    # Load artifacts
+    model = joblib.load("models/model.joblib")
     encoder = joblib.load("models/encoder.joblib")
     scaler = joblib.load("models/scaler.joblib")
-    model = joblib.load("models/model.joblib")
 
-    cat_cols = input_data.select_dtypes(include="object").columns.tolist()
-    num_cols = input_data.select_dtypes(exclude="object").columns.tolist()
+    # Preprocess input data
+    input_data = input_data.fillna(0)
+    num_cols = input_data.select_dtypes(include=np.number).columns
+    cat_cols = input_data.select_dtypes(exclude=np.number).columns
+    input_data[cat_cols] = input_data[cat_cols].astype(str)
 
-    X_processed = transform_features(input_data, encoder, scaler, cat_cols, num_cols)
-    preds = np.maximum(0, model.predict(X_processed))
-    return preds
+    # Apply transformations
+    input_num = scaler.transform(input_data[num_cols])
+    input_cat = encoder.transform(input_data[cat_cols])
+    input_processed = np.concatenate([input_num, input_cat], axis=1)
+
+    # Predict
+    predictions = np.maximum(model.predict(input_processed), 0)
+    return predictions
